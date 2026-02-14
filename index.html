@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pesquisa Carnaval 2026</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- SUAS CHAVES DO FIREBASE AQUI ---
+        const firebaseConfig = {
+            apiKey: "COLE_SUA_API_KEY_AQUI",
+            authDomain: "seu-projeto.firebaseapp.com",
+            projectId: "seu-projeto",
+            storageBucket: "seu-projeto.appspot.com",
+            messagingSenderId: "123456",
+            appId: "1:123456"
+        };
+
+        // Inicializa Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Ativa Modo Offline
+        try {
+            db.enablePersistence().catch((err) => {
+                if (err.code == 'failed-precondition') console.log('Muitas abas abertas');
+                else if (err.code == 'unimplemented') console.log('Sem suporte offline');
+            });
+        } catch(e) { console.log(e); }
+
+        const { useState, useEffect } = React;
+
+        function App() {
+            const [step, setStep] = useState(1);
+            const [loading, setLoading] = useState(false);
+            const [online, setOnline] = useState(navigator.onLine);
+            const [sucesso, setSucesso] = useState(false);
+            
+            // Dados do Formulário
+            const [formData, setFormData] = useState({
+                pesquisador: localStorage.getItem('pesquisador_nome') || '',
+                pais: 'Brasil', estado: '', cidade: '',
+                faixaEtaria: '', sexo: '', escolaridade: '', estadoCivil: '', renda: '',
+                despesaMedia: '', servicos: [], tempoPermanencia: '', acompanhantes: [], qtdAcompanhantes: '',
+                organizacaoViagem: '', sitesInfluencia: [], transporte: '', hospedagem: '', passeioTuristico: false
+            });
+
+            useEffect(() => {
+                window.addEventListener('online', () => setOnline(true));
+                window.addEventListener('offline', () => setOnline(false));
+                lucide.createIcons(); // Ativa ícones
+            }, [step, sucesso]);
+
+            const handleChange = (e) => {
+                const { name, value, type, checked } = e.target;
+                if (type === 'checkbox') {
+                    const list = formData[name] || [];
+                    if (checked) setFormData({ ...formData, [name]: [...list, value] });
+                    else setFormData({ ...formData, [name]: list.filter(item => item !== value) });
+                } else if (name === 'passeioTuristico') {
+                    setFormData({...formData, [name]: checked});
+                } else {
+                    setFormData({ ...formData, [name]: value });
+                }
+            };
+
+            const enviarDados = async () => {
+                if (!formData.pesquisador) return alert("Preencha o nome do pesquisador!");
+                setLoading(true);
+                try {
+                    await db.collection("pesquisas_carnaval_2026").add({
+                        ...formData,
+                        data_registro: new Date(),
+                        origem: navigator.onLine ? "Online" : "Salvo Offline"
+                    });
+                    setSucesso(true);
+                    setTimeout(() => {
+                        setSucesso(false);
+                        setStep(1);
+                        setFormData(prev => ({ ...prev, cidade: '', servicos: [], sitesInfluencia: [], acompanhantes: [], passeioTuristico: false }));
+                        window.scrollTo(0,0);
+                    }, 2000);
+                } catch (error) {
+                    alert("Erro: " + error.message);
+                }
+                setLoading(false);
+            };
+
+            if (sucesso) return (
+                <div className="min-h-screen flex flex-col items-center justify-center bg-green-600 text-white p-6 text-center">
+                    <i data-lucide="check-circle" width="80" height="80" className="mb-4 mx-auto"></i>
+                    <h1 className="text-3xl font-bold">Pesquisa Salva!</h1>
+                    <p className="mt-2">{online ? "Enviado para a nuvem." : "Salvo no celular (Offline)."}</p>
+                </div>
+            );
+
+            return (
+                <div className="pb-10 font-sans text-gray-800">
+                    <div className={`fixed top-0 left-0 w-full p-3 text-center text-white font-bold flex justify-center gap-2 shadow z-50 ${online ? 'bg-teal-600' : 'bg-red-600'}`}>
+                        {online ? "ONLINE" : "OFFLINE (Não feche a aba)"}
+                    </div>
+
+                    <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg mt-16 p-6">
+                        <div className="mb-4">
+                            <h2 className="text-xl font-bold text-gray-800">Carnaval 2026</h2>
+                            <div className="w-full bg-gray-200 h-2 rounded mt-2">
+                                <div className="bg-teal-600 h-2 rounded transition-all" style={{ width: `${(step/4)*100}%` }}></div>
+                            </div>
+                        </div>
+
+                        {step === 1 && (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2 text-teal-700 font-bold border-b pb-1">1. Origem</div>
+                                <input className="w-full p-3 border rounded" placeholder="Nome do Pesquisador" value={formData.pesquisador} 
+                                    onChange={(e) => {
+                                        setFormData({...formData, pesquisador: e.target.value});
+                                        localStorage.setItem('pesquisador_nome', e.target.value);
+                                    }} />
+                                <select name="estado" value={formData.estado} onChange={handleChange} className="w-full p-3 border rounded bg-white">
+                                    <option value="">Selecione Estado</option><option>PE</option><option>SP</option><option>RJ</option><option>BA</option><option>Outro</option>
+                                </select>
+                                <input name="cidade" placeholder="Cidade" value={formData.cidade} onChange={handleChange} className="w-full p-3 border rounded" />
+                            </div>
+                        )}
+
+                        {step === 2 && (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2 text-teal-700 font-bold border-b pb-1">2. Perfil</div>
+                                <select name="faixaEtaria" value={formData.faixaEtaria} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Faixa Etária</option><option>18-24</option><option>25-34</option><option>35-44</option><option>45+</option></select>
+                                <select name="sexo" value={formData.sexo} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Sexo</option><option>Masc</option><option>Fem</option></select>
+                                <select name="escolaridade" value={formData.escolaridade} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Escolaridade</option><option>Fundamental</option><option>Médio</option><option>Superior</option></select>
+                                <select name="renda" value={formData.renda} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Renda</option><option>Até 1 SM</option><option>1-3 SM</option><option>3+</option></select>
+                            </div>
+                        )}
+
+                        {step === 3 && (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2 text-teal-700 font-bold border-b pb-1">3. Economia</div>
+                                <select name="despesaMedia" value={formData.despesaMedia} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Gasto Diário</option><option>Até R$100</option><option>R$100-300</option><option>R$300+</option></select>
+                                <p className="font-bold text-sm">Serviços:</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {['Alimentação', 'Hospedagem', 'Transporte', 'Passeios'].map(opt => (
+                                    <label key={opt} className="flex items-center gap-2 text-sm"><input type="checkbox" name="servicos" value={opt} onChange={handleChange} /> {opt}</label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {step === 4 && (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2 text-teal-700 font-bold border-b pb-1">4. Viagem</div>
+                                <select name="organizacaoViagem" value={formData.organizacaoViagem} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Organização</option><option>Só</option><option>Agência</option></select>
+                                <label className="flex items-center gap-2 mt-4 font-bold bg-gray-100 p-3 rounded cursor-pointer">
+                                <input type="checkbox" name="passeioTuristico" checked={formData.passeioTuristico} onChange={handleChange} className="w-5 h-5" />
+                                Realizou Passeio Turístico?
+                                </label>
+                            </div>
+                        )}
+
+                        <div className="flex gap-3 mt-6">
+                            {step > 1 && <button onClick={() => setStep(s => s - 1)} className="flex-1 p-3 bg-gray-300 rounded font-bold">Voltar</button>}
+                            {step < 4 ? (
+                                <button onClick={() => setStep(s => s + 1)} className="flex-1 p-3 bg-teal-600 text-white rounded font-bold">Próximo</button>
+                            ) : (
+                                <button onClick={enviarDados} disabled={loading} className="flex-1 p-3 bg-green-600 text-white rounded font-bold">{loading ? "Enviando..." : "Salvar"}</button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
