@@ -11,6 +11,7 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 </head>
@@ -18,24 +19,23 @@
     <div id="root"></div>
 
     <script>
-        // Força o registro do Offline
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').then(r => console.log("SW OK")).catch(e => console.log("SW Falhou", e));
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log(err));
             });
         }
     </script>
 
     <script type="text/babel">
-        // --- SUAS CHAVES AQUI ---
+        // SUAS CHAVES JÁ ESTÃO AQUI:
         const firebaseConfig = {
-          apiKey: "AIzaSyAMIs-8XGJqGN_MyypN7T8qadUvd_kH4lk",
-          authDomain: "olindapesquisa-a9a42.firebaseapp.com",
-          projectId: "olindapesquisa-a9a42",
-          storageBucket: "olindapesquisa-a9a42.firebasestorage.app",
-          messagingSenderId: "562747371588",
-          appId: "1:562747371588:web:30166bb529498a49f48c11",
-          measurementId: "G-Q9KEXJLZ6R"
+            apiKey: "AIzaSyAMIs-8XGJqGN_MyypN7T8qadUvd_kH4lk",
+            authDomain: "olindapesquisa-a9a42.firebaseapp.com",
+            projectId: "olindapesquisa-a9a42",
+            storageBucket: "olindapesquisa-a9a42.firebasestorage.app",
+            messagingSenderId: "562747371588",
+            appId: "1:562747371588:web:30166bb529498a49f48c11",
+            measurementId: "G-Q9KEXJLZ6R"
         };
 
         firebase.initializeApp(firebaseConfig);
@@ -48,7 +48,7 @@
             const [step, setStep] = useState(1);
             const [online, setOnline] = useState(navigator.onLine);
             const [sucesso, setSucesso] = useState(false);
-            const [deferredPrompt, setDeferredPrompt] = useState(null);
+            const [installPrompt, setInstallPrompt] = useState(null);
 
             const [formData, setFormData] = useState({
                 pesquisador: localStorage.getItem('pesquisador_nome') || '',
@@ -63,7 +63,7 @@
                 window.addEventListener('offline', () => setOnline(false));
                 window.addEventListener('beforeinstallprompt', (e) => {
                     e.preventDefault();
-                    setDeferredPrompt(e);
+                    setInstallPrompt(e);
                 });
                 lucide.createIcons();
             }, [step, sucesso]);
@@ -82,21 +82,21 @@
             };
 
             const instalar = () => {
-                if (deferredPrompt) {
-                    deferredPrompt.prompt();
-                    setDeferredPrompt(null);
+                if (installPrompt) {
+                    installPrompt.prompt();
+                    setInstallPrompt(null);
                 } else {
-                    alert("Para instalar:\nNo iPhone: Toque em Compartilhar (quadrado com seta) > Adicionar à Tela de Início.\nNo Android: Toque nos 3 pontinhos > Instalar aplicativo.");
+                    alert("Para instalar:\niPhone: Toque em Compartilhar > Adicionar à Tela de Início.\nAndroid: Toque nos 3 pontinhos > Instalar aplicativo.");
                 }
             };
 
             const salvarAgora = () => {
                 if (!formData.pesquisador) return alert("Preencha o nome do pesquisador!");
                 
-                // DESTRAVAMENTO: Atualiza a tela ANTES de falar com o servidor
+                // DESTRAVA IMEDIATAMENTE (Não espera o Google)
                 setSucesso(true); 
 
-                // Manda em segundo plano (se falhar, o Service Worker segura)
+                // Envia em segundo plano
                 db.collection("pesquisas_carnaval_2026").add({
                     ...formData,
                     data_registro: new Date(),
@@ -115,15 +115,17 @@
             if (sucesso) return (
                 <div className="min-h-screen flex flex-col items-center justify-center bg-green-600 text-white p-6 text-center">
                     <h1 className="text-4xl font-bold mb-4">SALVO!</h1>
-                    <p className="text-xl">Pode seguir.</p>
+                    <p className="text-xl">Sincronizando em segundo plano...</p>
                 </div>
             );
 
             return (
                 <div className="pb-20 font-sans text-gray-800 bg-gray-50 min-h-screen">
                     <div className={`fixed top-0 left-0 w-full p-3 flex justify-between items-center px-4 shadow z-50 text-white font-bold ${online ? 'bg-teal-600' : 'bg-orange-600'}`}>
-                        <span>{online ? "ONLINE" : "OFFLINE"}</span>
-                        <button onClick={instalar} className="bg-white text-teal-800 px-3 py-1 rounded text-xs uppercase shadow">
+                        <span className="flex items-center gap-2">
+                             {online ? "ONLINE" : "OFFLINE"}
+                        </span>
+                        <button onClick={instalar} className="bg-white text-teal-800 px-3 py-1 rounded text-xs uppercase shadow font-bold">
                             BAIXAR APP
                         </button>
                     </div>
@@ -149,12 +151,12 @@
                             </div>
                         )}
 
-                        {/* ... (Outras etapas iguais, simplificadas para caber) ... */}
                         {step === 2 && (
                             <div className="space-y-4">
                                 <div className="text-teal-700 font-bold border-b pb-1">2. Perfil</div>
                                 <select name="faixaEtaria" value={formData.faixaEtaria} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Faixa Etária</option><option>18-24</option><option>25-34</option><option>35-44</option><option>45+</option></select>
                                 <select name="sexo" value={formData.sexo} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Sexo</option><option>Masc</option><option>Fem</option></select>
+                                <select name="escolaridade" value={formData.escolaridade} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Escolaridade</option><option>Fundamental</option><option>Médio</option><option>Superior</option></select>
                                 <select name="renda" value={formData.renda} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Renda</option><option>Até 1 SM</option><option>1-3</option><option>3+</option></select>
                             </div>
                         )}
