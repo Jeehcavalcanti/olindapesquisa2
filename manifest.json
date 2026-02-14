@@ -1,15 +1,9 @@
 {
-  "name": "Pesquisa Olinda 2026",
-  "short_name": "PesquisaOlinda",
-  "start_url": ".",
+  "name": "Pesquisa Olinda",
+  "short_name": "Pesquisa",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0d9488",
-  "icons": [
-    {
-      "src": "https://cdn-icons-png.flaticon.com/512/1698/1698535.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    }
-  ]
+  "icons": [ { "src": "https://cdn-icons-png.flaticon.com/512/1698/1698535.png", "sizes": "192x192", "type": "image/png" } ]
 }
