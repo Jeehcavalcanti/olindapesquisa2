@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pesquisa Carnaval 2026</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0d9488">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -13,41 +15,47 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 select-none">
     <div id="root"></div>
 
-    <script type="text/babel">
-        // --- SUAS CHAVES DO FIREBASE AQUI ---
-        const firebaseConfig = {
-            apiKey: "COLE_SUA_API_KEY_AQUI",
-            authDomain: "seu-projeto.firebaseapp.com",
-            projectId: "seu-projeto",
-            storageBucket: "seu-projeto.appspot.com",
-            messagingSenderId: "123456",
-            appId: "1:123456"
-        };
+    <script>
+        // Registra o App Offline (Service Worker)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('App Offline Registrado!', reg.scope))
+                    .catch(err => console.log('Falha no App Offline:', err));
+            });
+        }
+    </script>
 
-        // Inicializa Firebase
+    <script type="text/babel">
+        // --- 🔴 COLE SUAS CHAVES AQUI NOVAMENTE ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyAMIs-8XGJqGN_MyypN7T8qadUvd_kH4lk",
+          authDomain: "olindapesquisa-a9a42.firebaseapp.com",
+          projectId: "olindapesquisa-a9a42",
+          storageBucket: "olindapesquisa-a9a42.firebasestorage.app",
+          messagingSenderId: "562747371588",
+          appId: "1:562747371588:web:30166bb529498a49f48c11",
+          measurementId: "G-Q9KEXJLZ6R"
+            };
+
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // Ativa Modo Offline
         try {
-            db.enablePersistence().catch((err) => {
-                if (err.code == 'failed-precondition') console.log('Muitas abas abertas');
-                else if (err.code == 'unimplemented') console.log('Sem suporte offline');
-            });
-        } catch(e) { console.log(e); }
+            db.enablePersistence().catch(err => console.log(err.code));
+        } catch(e) {}
 
         const { useState, useEffect } = React;
 
         function App() {
             const [step, setStep] = useState(1);
-            const [loading, setLoading] = useState(false);
             const [online, setOnline] = useState(navigator.onLine);
             const [sucesso, setSucesso] = useState(false);
-            
-            // Dados do Formulário
+            const [installPrompt, setInstallPrompt] = useState(null);
+
             const [formData, setFormData] = useState({
                 pesquisador: localStorage.getItem('pesquisador_nome') || '',
                 pais: 'Brasil', estado: '', cidade: '',
@@ -59,7 +67,11 @@
             useEffect(() => {
                 window.addEventListener('online', () => setOnline(true));
                 window.addEventListener('offline', () => setOnline(false));
-                lucide.createIcons(); // Ativa ícones
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    e.preventDefault();
+                    setInstallPrompt(e);
+                });
+                lucide.createIcons();
             }, [step, sucesso]);
 
             const handleChange = (e) => {
@@ -75,83 +87,103 @@
                 }
             };
 
-            const enviarDados = async () => {
-                if (!formData.pesquisador) return alert("Preencha o nome do pesquisador!");
-                setLoading(true);
-                try {
-                    await db.collection("pesquisas_carnaval_2026").add({
-                        ...formData,
-                        data_registro: new Date(),
-                        origem: navigator.onLine ? "Online" : "Salvo Offline"
-                    });
-                    setSucesso(true);
-                    setTimeout(() => {
-                        setSucesso(false);
-                        setStep(1);
-                        setFormData(prev => ({ ...prev, cidade: '', servicos: [], sitesInfluencia: [], acompanhantes: [], passeioTuristico: false }));
-                        window.scrollTo(0,0);
-                    }, 2000);
-                } catch (error) {
-                    alert("Erro: " + error.message);
+            const instalarApp = () => {
+                if (installPrompt) {
+                    installPrompt.prompt();
+                    setInstallPrompt(null);
+                } else {
+                    alert("Para instalar no iPhone/iPad:\n1. Toque no botão 'Compartilhar' (quadrado com seta).\n2. Selecione 'Adicionar à Tela de Início'.");
                 }
-                setLoading(false);
+            };
+
+            const salvarAgora = () => {
+                if (!formData.pesquisador) return alert("Falta o nome do pesquisador!");
+                
+                // Mágica: Salva instantaneamente na tela (não espera o servidor)
+                setSucesso(true);
+                
+                // Envia em segundo plano
+                db.collection("pesquisas_carnaval_2026").add({
+                    ...formData,
+                    data_registro: new Date(),
+                    origem: navigator.onLine ? "Online" : "Salvo Offline"
+                }).then(() => console.log("Sincronizado!"))
+                  .catch(err => console.error("Ficará pendente:", err));
+
+                setTimeout(() => {
+                    setSucesso(false);
+                    setStep(1);
+                    setFormData(prev => ({ 
+                        ...prev, cidade: '', servicos: [], sitesInfluencia: [], acompanhantes: [], passeioTuristico: false 
+                    }));
+                    window.scrollTo(0,0);
+                }, 1500); // 1.5 segundos para feedback visual
             };
 
             if (sucesso) return (
-                <div className="min-h-screen flex flex-col items-center justify-center bg-green-600 text-white p-6 text-center">
-                    <i data-lucide="check-circle" width="80" height="80" className="mb-4 mx-auto"></i>
-                    <h1 className="text-3xl font-bold">Pesquisa Salva!</h1>
-                    <p className="mt-2">{online ? "Enviado para a nuvem." : "Salvo no celular (Offline)."}</p>
+                <div className="min-h-screen flex flex-col items-center justify-center bg-green-600 text-white p-6 text-center animate-pulse">
+                    <i data-lucide="check-circle" width="100" height="100" className="mb-4 mx-auto"></i>
+                    <h1 className="text-4xl font-bold">SALVO!</h1>
+                    <p className="mt-4 text-lg">Pode seguir para o próximo.</p>
                 </div>
             );
 
             return (
-                <div className="pb-10 font-sans text-gray-800">
-                    <div className={`fixed top-0 left-0 w-full p-3 text-center text-white font-bold flex justify-center gap-2 shadow z-50 ${online ? 'bg-teal-600' : 'bg-red-600'}`}>
-                        {online ? "ONLINE" : "OFFLINE (Não feche a aba)"}
+                <div className="pb-20 font-sans text-gray-800 bg-gray-50 min-h-screen">
+                    {/* Barra Topo */}
+                    <div className={`fixed top-0 left-0 w-full p-3 text-center text-white font-bold flex justify-between items-center px-4 shadow z-50 ${online ? 'bg-teal-600' : 'bg-orange-600'}`}>
+                        <div className="flex items-center gap-2">
+                            <i data-lucide={online ? "wifi" : "wifi-off"} width="18"></i>
+                            {online ? "ONLINE" : "OFFLINE"}
+                        </div>
+                        <button onClick={instalarApp} className="bg-white text-teal-700 px-3 py-1 rounded text-xs font-bold uppercase tracking-wide shadow">
+                            Baixar App
+                        </button>
                     </div>
 
-                    <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg mt-16 p-6">
-                        <div className="mb-4">
-                            <h2 className="text-xl font-bold text-gray-800">Carnaval 2026</h2>
-                            <div className="w-full bg-gray-200 h-2 rounded mt-2">
-                                <div className="bg-teal-600 h-2 rounded transition-all" style={{ width: `${(step/4)*100}%` }}></div>
+                    <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg mt-16 p-6 border border-gray-200">
+                        {/* Progresso */}
+                        <div className="mb-6">
+                            <h2 className="text-xl font-bold text-gray-800">Pesquisa 2026</h2>
+                            <div className="w-full bg-gray-200 h-2 rounded-full mt-2">
+                                <div className="bg-teal-500 h-2 rounded-full transition-all duration-500" style={{ width: `${(step/4)*100}%` }}></div>
                             </div>
                         </div>
 
+                        {/* --- FORMULÁRIOS --- */}
                         {step === 1 && (
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 text-teal-700 font-bold border-b pb-1">1. Origem</div>
-                                <input className="w-full p-3 border rounded" placeholder="Nome do Pesquisador" value={formData.pesquisador} 
+                            <div className="space-y-4 animate-fade-in">
+                                <div className="text-teal-700 font-bold border-b pb-2 text-lg">📍 Origem</div>
+                                <input className="w-full p-4 border rounded-lg bg-gray-50 text-lg" placeholder="Seu Nome (Pesquisador)" value={formData.pesquisador} 
                                     onChange={(e) => {
                                         setFormData({...formData, pesquisador: e.target.value});
                                         localStorage.setItem('pesquisador_nome', e.target.value);
                                     }} />
-                                <select name="estado" value={formData.estado} onChange={handleChange} className="w-full p-3 border rounded bg-white">
-                                    <option value="">Selecione Estado</option><option>PE</option><option>SP</option><option>RJ</option><option>BA</option><option>Outro</option>
+                                <select name="estado" value={formData.estado} onChange={handleChange} className="w-full p-4 border rounded-lg bg-white text-lg">
+                                    <option value="">Estado de Origem</option><option>PE - Pernambuco</option><option>SP - São Paulo</option><option>RJ - Rio de Janeiro</option><option>PB - Paraíba</option><option>BA - Bahia</option><option>Outro</option>
                                 </select>
-                                <input name="cidade" placeholder="Cidade" value={formData.cidade} onChange={handleChange} className="w-full p-3 border rounded" />
+                                <input name="cidade" placeholder="Cidade" value={formData.cidade} onChange={handleChange} className="w-full p-4 border rounded-lg bg-gray-50 text-lg" />
                             </div>
                         )}
 
                         {step === 2 && (
                             <div className="space-y-4">
-                                <div className="flex items-center gap-2 text-teal-700 font-bold border-b pb-1">2. Perfil</div>
-                                <select name="faixaEtaria" value={formData.faixaEtaria} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Faixa Etária</option><option>18-24</option><option>25-34</option><option>35-44</option><option>45+</option></select>
-                                <select name="sexo" value={formData.sexo} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Sexo</option><option>Masc</option><option>Fem</option></select>
-                                <select name="escolaridade" value={formData.escolaridade} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Escolaridade</option><option>Fundamental</option><option>Médio</option><option>Superior</option></select>
-                                <select name="renda" value={formData.renda} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Renda</option><option>Até 1 SM</option><option>1-3 SM</option><option>3+</option></select>
+                                <div className="text-teal-700 font-bold border-b pb-2 text-lg">👤 Perfil</div>
+                                <select name="faixaEtaria" value={formData.faixaEtaria} onChange={handleChange} className="w-full p-4 border rounded-lg bg-white text-lg"><option value="">Faixa Etária</option><option>18-24 anos</option><option>25-34 anos</option><option>35-44 anos</option><option>45-59 anos</option><option>60+ anos</option></select>
+                                <select name="sexo" value={formData.sexo} onChange={handleChange} className="w-full p-4 border rounded-lg bg-white text-lg"><option value="">Sexo</option><option>Masculino</option><option>Feminino</option><option>Outro</option></select>
+                                <select name="escolaridade" value={formData.escolaridade} onChange={handleChange} className="w-full p-4 border rounded-lg bg-white text-lg"><option value="">Escolaridade</option><option>Fundamental</option><option>Médio</option><option>Superior</option></select>
+                                <select name="renda" value={formData.renda} onChange={handleChange} className="w-full p-4 border rounded-lg bg-white text-lg"><option value="">Renda Familiar</option><option>Até 1 SM</option><option>1-3 SM</option><option>3-5 SM</option><option>5+ SM</option></select>
                             </div>
                         )}
 
                         {step === 3 && (
                             <div className="space-y-4">
-                                <div className="flex items-center gap-2 text-teal-700 font-bold border-b pb-1">3. Economia</div>
-                                <select name="despesaMedia" value={formData.despesaMedia} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Gasto Diário</option><option>Até R$100</option><option>R$100-300</option><option>R$300+</option></select>
-                                <p className="font-bold text-sm">Serviços:</p>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="text-teal-700 font-bold border-b pb-2 text-lg">💰 Economia</div>
+                                <select name="despesaMedia" value={formData.despesaMedia} onChange={handleChange} className="w-full p-4 border rounded-lg bg-white text-lg"><option value="">Gasto Diário (Média)</option><option>Até R$100</option><option>R$100-300</option><option>R$300+</option></select>
+                                <p className="font-bold text-gray-700">Serviços Utilizados:</p>
+                                <div className="grid grid-cols-2 gap-3">
                                     {['Alimentação', 'Hospedagem', 'Transporte', 'Passeios'].map(opt => (
-                                    <label key={opt} className="flex items-center gap-2 text-sm"><input type="checkbox" name="servicos" value={opt} onChange={handleChange} /> {opt}</label>
+                                    <label key={opt} className="flex items-center gap-3 p-2 border rounded hover:bg-teal-50"><input type="checkbox" className="w-5 h-5 text-teal-600" name="servicos" value={opt} onChange={handleChange} /> {opt}</label>
                                     ))}
                                 </div>
                             </div>
@@ -159,21 +191,22 @@
 
                         {step === 4 && (
                             <div className="space-y-4">
-                                <div className="flex items-center gap-2 text-teal-700 font-bold border-b pb-1">4. Viagem</div>
-                                <select name="organizacaoViagem" value={formData.organizacaoViagem} onChange={handleChange} className="w-full p-3 border rounded"><option value="">Organização</option><option>Só</option><option>Agência</option></select>
-                                <label className="flex items-center gap-2 mt-4 font-bold bg-gray-100 p-3 rounded cursor-pointer">
-                                <input type="checkbox" name="passeioTuristico" checked={formData.passeioTuristico} onChange={handleChange} className="w-5 h-5" />
-                                Realizou Passeio Turístico?
+                                <div className="text-teal-700 font-bold border-b pb-2 text-lg">✈️ Viagem</div>
+                                <select name="organizacaoViagem" value={formData.organizacaoViagem} onChange={handleChange} className="w-full p-4 border rounded-lg bg-white text-lg"><option value="">Organização</option><option>Só / Conta Própria</option><option>Agência / Excursão</option></select>
+                                <label className="flex items-center gap-4 mt-6 p-4 bg-teal-50 border border-teal-200 rounded-xl cursor-pointer">
+                                    <input type="checkbox" name="passeioTuristico" checked={formData.passeioTuristico} onChange={handleChange} className="w-6 h-6 text-teal-600 rounded focus:ring-teal-500" />
+                                    <span className="font-bold text-teal-900">Realizou Passeio Turístico?</span>
                                 </label>
                             </div>
                         )}
 
-                        <div className="flex gap-3 mt-6">
-                            {step > 1 && <button onClick={() => setStep(s => s - 1)} className="flex-1 p-3 bg-gray-300 rounded font-bold">Voltar</button>}
+                        {/* Botões Grandes */}
+                        <div className="flex gap-3 mt-8">
+                            {step > 1 && <button onClick={() => setStep(s => s - 1)} className="flex-1 py-4 bg-gray-200 text-gray-700 rounded-xl font-bold text-lg">Voltar</button>}
                             {step < 4 ? (
-                                <button onClick={() => setStep(s => s + 1)} className="flex-1 p-3 bg-teal-600 text-white rounded font-bold">Próximo</button>
+                                <button onClick={() => setStep(s => s + 1)} className="flex-1 py-4 bg-teal-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-teal-700">Próximo</button>
                             ) : (
-                                <button onClick={enviarDados} disabled={loading} className="flex-1 p-3 bg-green-600 text-white rounded font-bold">{loading ? "Enviando..." : "Salvar"}</button>
+                                <button onClick={salvarAgora} className="flex-1 py-4 bg-green-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-green-700">SALVAR AGORA</button>
                             )}
                         </div>
                     </div>
